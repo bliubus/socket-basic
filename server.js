@@ -6,6 +6,30 @@ var io = require('socket.io')(http);
 var moment = require('moment');
 var clientInfo = {};
 
+// Sends current users to provided socket
+function sendCurrentUsers(socket) {
+	var info = clientInfo[socket.id];
+	var users = [];
+
+	if (typeof info === 'undefined') {
+		return;
+	}
+
+	Object.keys(clientInfo).forEach(function(socketId) {
+		var userInfo = clientInfo[socketId];
+
+		if (info.room === userInfo.room) {
+			users.push(userInfo.name);
+		}
+	});
+
+	socket.emit('message', {
+		name: 'System',
+		text: 'Current users: ' + users.join(',' ),
+		timestamp: moment().valueOf()
+	});
+}
+
 app.use(express.static(__dirname + '/public'));
 
 io.on('connection', function(socket) {
@@ -40,9 +64,14 @@ io.on('connection', function(socket) {
 
 	socket.on('message', function(message) {
 		console.log('Message received: ' + message.text);
-		message.timestamp = moment().valueOf(); // millis
-		// socket.broadcast.emit('message', message); // send to everybody but the sender
-		io.to(clientInfo[socket.id].room).emit('message', message); // send the reply to everybody including the sender
+
+		if (message.text === '@currentUsers') {
+			sendCurrentUsers(socket);
+		} else {
+			message.timestamp = moment().valueOf(); // millis
+			// socket.broadcast.emit('message', message); // send to everybody but the sender
+			io.to(clientInfo[socket.id].room).emit('message', message); // send the reply to everybody including the sender			
+		}
 	});
 
 	socket.emit('message', {
